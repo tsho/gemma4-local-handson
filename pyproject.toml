@@ -1,0 +1,37 @@
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[project]
+name = "gemma-local-playground"
+version = "0.1.0"
+description = "A local Gemma 4 playground with FastAPI and llama.cpp or vLLM"
+requires-python = ">=3.11"
+dependencies = [
+  "fastapi>=0.115,<1",
+  "uvicorn>=0.34,<1",
+  "httpx>=0.28,<1",
+  "pydantic-settings>=2.8,<3",
+]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.11,<1"]
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gemma_demo"]
+
+[tool.ruff]
+line-length = 80
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "D2", "D3", "D4"]
+
+[tool.ruff.lint.pydocstyle]
+convention = "google"
+
+[tool.ruff.format]
+docstring-code-format = true
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
