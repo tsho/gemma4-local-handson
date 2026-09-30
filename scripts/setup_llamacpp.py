@@ -3,26 +3,29 @@
 import argparse
 import hashlib
 import json
+import pathlib
 import platform
 import shutil
 import tarfile
 import urllib.request
 import zipfile
-from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = pathlib.Path(__file__).resolve().parents[1]
 LLAMA_TAG = "b11146"
 MODEL_REPO = "google/gemma-4-12B-it-qat-q4_0-gguf"
 MODEL_REVISION = "29d097773436b69ff9feafd636ab4cf873786537"
 MODEL_FILE = "gemma-4-12b-it-qat-q4_0.gguf"
+MMPROJ_FILE = "mmproj-gemma-4-12b-it-qat-q4_0.gguf"
 
 
 def read_json(url):
+    """Read JSON metadata from an official release endpoint."""
     with urllib.request.urlopen(url, timeout=60) as response:
         return json.load(response)
 
 
 def sha256(path):
+    """Compute a file digest without loading the whole file into memory."""
     digest = hashlib.sha256()
     with path.open("rb") as source:
         while chunk := source.read(8 * 1024 * 1024):
@@ -31,6 +34,7 @@ def sha256(path):
 
 
 def download(url, target, expected_hash=None):
+    """Download an artifact and verify its checksum when supplied."""
     target.parent.mkdir(parents=True, exist_ok=True)
     if target.exists() and expected_hash and sha256(target) == expected_hash:
         print(f"Already verified: {target.name}", flush=True)
@@ -55,6 +59,7 @@ def download(url, target, expected_hash=None):
 
 
 def setup_runtime():
+    """Install the pinned Apple Silicon runtime in the project directory."""
     if platform.system() != "Darwin" or platform.machine() != "arm64":
         raise SystemExit(
             "This installer targets Apple Silicon. See docs/setup-linux-gpu.md."
@@ -103,33 +108,37 @@ def setup_runtime():
     print(f"Runtime ready: {server.relative_to(ROOT)}", flush=True)
 
 
-def setup_model():
+def setup_model(filename=MODEL_FILE):
+    """Download and verify a model or its matching multimodal projector."""
     info = read_json(
         f"https://huggingface.co/api/models/{MODEL_REPO}/revision/{MODEL_REVISION}?blobs=true"
     )
     entry = next(
-        item for item in info["siblings"] if item["rfilename"] == MODEL_FILE
+        item for item in info["siblings"] if item["rfilename"] == filename
     )
     digest = entry.get("lfs", {}).get("sha256")
     if not digest:
         raise RuntimeError("Model SHA256 is missing from official metadata")
-    model = ROOT / "models" / MODEL_FILE
+    model = ROOT / "models" / filename
     required = entry.get("size", 9 * 1024**3)
     if not model.exists() and shutil.disk_usage(ROOT).free < required + 1024**3:
         raise RuntimeError("Insufficient free disk space for model download")
     download(
-        f"https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_REVISION}/{MODEL_FILE}",
+        f"https://huggingface.co/{MODEL_REPO}/resolve/{MODEL_REVISION}/{filename}",
         model,
         digest,
     )
     manifest = {
         "repo": MODEL_REPO,
         "revision": MODEL_REVISION,
-        "file": MODEL_FILE,
+        "file": filename,
         "sha256": digest,
         "llama_tag": LLAMA_TAG,
     }
-    (model.parent / "manifest.json").write_text(
+    manifest_name = (
+        "manifest.json" if filename == MODEL_FILE else "mmproj-manifest.json"
+    )
+    (model.parent / manifest_name).write_text(
         json.dumps(manifest, indent=2) + "\n"
     )
     print("Model checksum verified.", flush=True)
@@ -142,3 +151,4 @@ if __name__ == "__main__":
     setup_runtime()
     if not args.runtime_only:
         setup_model()
+        setup_model(MMPROJ_FILE)

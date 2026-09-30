@@ -1,17 +1,19 @@
 """Verify a running app and model, including cancellation and reuse."""
 
+import argparse
 import asyncio
 import json
 
 import httpx
 
-from gemma_demo.inference import sse_data
+from gemma_demo import inference
 
 
-async def main():
+async def main(url: str = "http://127.0.0.1:8000"):
+    """Verify streaming, cancellation and recovery against the chosen app."""
     report = {}
     async with httpx.AsyncClient(
-        base_url="http://127.0.0.1:8000", timeout=180, trust_env=False
+        base_url=url, timeout=180, trust_env=False
     ) as client:
         health = await client.get("/api/health")
         health.raise_for_status()
@@ -33,7 +35,7 @@ async def main():
                 },
             ) as response:
                 response.raise_for_status()
-                async for raw in sse_data(response):
+                async for raw in inference.sse_data(response):
                     event = json.loads(raw)
                     assert event["type"] != "error", event
                     if event["type"] == "delta":
@@ -64,7 +66,7 @@ async def main():
             },
         ) as response:
             response.raise_for_status()
-            async for raw in sse_data(response):
+            async for raw in inference.sse_data(response):
                 event = json.loads(raw)
                 assert event["type"] != "error", event
                 if event["type"] == "delta":
@@ -85,4 +87,6 @@ async def main():
 
 
 if __name__ == "__main__":
-    asyncio.run(main())
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("--url", default="http://127.0.0.1:8000")
+    asyncio.run(main(parser.parse_args().url))

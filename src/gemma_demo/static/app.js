@@ -2,6 +2,9 @@ const $ = (id) => document.getElementById(id);
 const history = [];
 const runs = [];
 let controller = null;
+let attachment = null;
+let imageLoading = false;
+let imageSelection = 0;
 let lastRequest = null;
 let server = { backend: "llama.cpp", model: "gemma4" };
 
@@ -39,7 +42,10 @@ function settings() {
 }
 
 function busy(value) {
-  $("send").disabled = value;
+  $("send").disabled = value || imageLoading;
+  $("attach-image").disabled = value;
+  $("image-file").disabled = value;
+  $("remove-image").disabled = value;
   $("stop").hidden = !value;
   $("clear").disabled = value;
   $("retry").disabled = value || !lastRequest;
@@ -49,7 +55,7 @@ function busy(value) {
   for (const button of document.querySelectorAll("[data-prompt]")) button.disabled = value;
 }
 
-function addMessage(role, text) {
+function addMessage(role, text, images = []) {
   $("welcome").hidden = true;
   const article = document.createElement("article");
   article.className = `message ${role}`;
@@ -61,7 +67,15 @@ function addMessage(role, text) {
   body.textContent = text;
   const state = document.createElement("div");
   state.className = "message-state";
-  article.append(label, body, state);
+  article.append(label, body);
+  for (const source of images) {
+    const image = document.createElement("img");
+    image.src = source;
+    image.alt = "送信した画像";
+    image.className = "message-image";
+    article.append(image);
+  }
+  article.append(state);
   $("conversation").append(article);
   article.scrollIntoView({ block: "nearest" });
   return { body, state };
@@ -102,7 +116,7 @@ async function generate(request, replay = false) {
   // Retry restores the original context, so the failed/previous answer is not fed back.
   history.splice(0, history.length, ...structuredClone(request.messages.slice(0, -1)));
   const userMessage = request.messages.at(-1);
-  addMessage("user", userMessage.content + (replay ? "\n［再実行］" : ""));
+  addMessage("user", userMessage.content + (replay ? "\n［再実行］" : ""), userMessage.images);
   const view = addMessage("assistant", "");
   const run = { created_at: new Date().toISOString(), backend: server.backend, model: server.model, request: structuredClone(request), output: "", status: "running", metrics: null };
   runs.push(run);
@@ -155,11 +169,17 @@ $("temperature").addEventListener("input", () => { $("temperature-value").value 
 $("settings-form").addEventListener("submit", (event) => event.preventDefault());
 $("chat-form").addEventListener("submit", (event) => {
   event.preventDefault();
-  if (controller || !$("settings-form").reportValidity()) return;
+  if (controller || imageLoading || !$("settings-form").reportValidity()) return;
   const content = $("prompt").value.trim();
   if (!content) return;
+  const images = attachment ? [attachment] : [];
+  if (images.length + history.reduce((count, message) => count + (message.images?.length || 0), 0) > 4) {
+    notice("画像は会話全体で4枚までです。新しい会話を始めてください。", true);
+    return;
+  }
   $("prompt").value = "";
-  generate({ ...settings(), messages: [...history, { role: "user", content }] });
+  clearAttachment();
+  generate({ ...settings(), messages: [...history, { role: "user", content, images }] });
 });
 $("prompt").addEventListener("keydown", (event) => {
   if (event.key === "Enter" && (event.metaKey || event.ctrlKey) && !event.isComposing) {
@@ -172,6 +192,7 @@ $("retry").addEventListener("click", () => {
   if (lastRequest && $("settings-form").reportValidity()) generate({ ...lastRequest, ...settings() }, true);
 });
 $("clear").addEventListener("click", () => {
+  clearAttachment();
   history.length = 0;
   lastRequest = null;
   for (const message of document.querySelectorAll(".message")) message.remove();
@@ -194,3 +215,53 @@ for (const button of document.querySelectorAll("[data-prompt]")) {
 }
 $("connection").addEventListener("click", checkConnection);
 checkConnection();
+
+function clearAttachment() {
+  imageSelection += 1;
+  imageLoading = false;
+  attachment = null;
+  $("image-file").value = "";
+  $("preview-image").removeAttribute("src");
+  $("image-preview").hidden = true;
+  $("image-name").textContent = "";
+  busy(Boolean(controller));
+}
+
+$("attach-image").addEventListener("click", () => $("image-file").click());
+$("remove-image").addEventListener("click", clearAttachment);
+$("image-file").addEventListener("change", async () => {
+  const file = $("image-file").files[0];
+  if (!file) return;
+  clearAttachment();
+  if (!["image/png", "image/jpeg", "image/webp"].includes(file.type) || file.size > 5 * 1024 * 1024 || !file.size) {
+    notice("5MB以下のPNG・JPEG・WebP画像を選択してください。", true);
+    return;
+  }
+  const selection = imageSelection;
+  imageLoading = true;
+  busy(false);
+  try {
+    const source = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(new Error("画像を読み込めませんでした。"));
+      reader.readAsDataURL(file);
+    });
+    const probe = new Image();
+    probe.src = source;
+    await probe.decode();
+    if (selection !== imageSelection) return;
+    attachment = source;
+    $("preview-image").src = source;
+    $("image-name").textContent = file.name;
+    $("image-preview").hidden = false;
+    notice("画像を添付しました。質問を入力して送信してください。");
+  } catch {
+    if (selection === imageSelection) notice("画像を読み込めません。別の画像を選択してください。", true);
+  } finally {
+    if (selection === imageSelection) {
+      imageLoading = false;
+      busy(Boolean(controller));
+    }
+  }
+});
