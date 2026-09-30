@@ -140,3 +140,146 @@ docs/                環境別手順と実験ガイド
 - [llama.cpp](https://github.com/ggml-org/llama.cpp)
 - [vLLM](https://docs.vllm.ai/en/latest/)
 - [FastAPI](https://fastapi.tiangolo.com/)
+
+---
+
+# Gemma Local Playground — English
+
+An intermediate hands-on project for running Gemma 4 locally and comparing inference settings and responses.
+The FastAPI web app connects to **llama.cpp / vLLM** running in a separate process.
+
+- **[Colab version](https://colab.research.google.com/drive/1W8Vl-ilqCkLcAQDHuTso7mIQB4PnXdSk#scrollTo=KI2TiESdFcEk)**: An environment for users without local computing resources. Recommended for beginners.
+- **This repository**: A local version covering inference server setup, quantization, generation settings, and application integration. Use it as a baseline for your own improvements.
+
+No connection to Colab or cloud API is required. Internet access is needed for the initial package and model downloads.
+
+```text
+Browser :8000 (use a different port if 8000 is already in use)
+  └─ FastAPI (web UI / input validation / SSE relay)
+       └─ OpenAI-compatible HTTP API :8080
+            ├─ llama.cpp + Metal (basic Mac track)
+            └─ vLLM + CUDA (advanced Linux GPU track)
+```
+
+## Features
+
+- Japanese chat, streaming responses, and generation cancellation
+- Adjustable system prompt / temperature / top_p / max_tokens / seed
+- Display of time to first response text, total response time, and generated token counts reported by the server
+- Rerun the same input with new settings and download run history as JSON
+- Connection checks, model name mismatch detection, and guidance when the server is not running
+- A script for sequential comparisons using sample inputs
+
+Conversations are stored in the current tab's memory and disappear on reload. Save any results you want to keep as JSON.
+Stopped or failed responses are not included in subsequent conversation context. Model output is displayed as plain text.
+RAG and tool execution are not currently supported. Adding them yourself could be a useful next step.
+
+## Getting started on Mac
+
+Requirements: an Apple Silicon Mac, Python 3.11 or later, and [uv](https://docs.astral.sh/uv/).
+This project uses 12B Q4_0 and targets a development machine with 48GB of memory.
+Allow at least 12GB of free disk space for the model, runtime, and working files. Available memory also depends on other running apps.
+
+Other Linux and Mac environments may work, but compatibility is not guaranteed. Check and adapt the setup for your own environment.
+Windows is not a supported target. WSL may work, but you will need to handle that setup yourself.
+
+Run from the project root:
+
+```bash
+uv sync --frozen
+cp .env.example .env
+uv run python scripts/setup_llamacpp.py
+```
+
+The setup script downloads pinned versions from official sources. The runtime is stored in `.runtime/` and models in `models/`, without a system-wide installation.
+The model and the image-processing mmproj file (approximately 175MB) are verified using SHA256.
+
+Even if you have already completed setup, rerun `setup_llamacpp.py` above.
+It reuses the verified model and downloads the mmproj file if it is missing.
+Then stop the running inference server and app, and restart them with the following commands.
+
+In terminal 1, start the inference server:
+
+```bash
+bash scripts/serve_llamacpp.sh
+```
+
+In terminal 2, start the app:
+
+```bash
+bash scripts/serve_app.sh
+```
+
+Both processes must run at the same time.
+
+Open **http://127.0.0.1:8000**. After the model has finished loading, click the connection button in the upper-right corner to check again.
+The API documentation is at http://127.0.0.1:8000/docs. Press `Ctrl+C` in each terminal to stop its process.
+
+See [Mac setup](docs/setup-mac.md) and [Linux GPU / vLLM](docs/setup-linux-gpu.md) for details.
+The [verification record](docs/verification.md) describes checks performed with the real model and areas not yet verified.
+
+## Running experiments
+
+1. Try the same question with the default settings and save the response and timings.
+2. Change Temperature and click “再実行” (Rerun) to regenerate using the original input and conversation context.
+3. Restart the inference server when changing the model, quantization, or context length.
+4. Compare the same set of inputs, evaluating response accuracy and readability as well as speed.
+
+```bash
+uv run python benchmarks/compare.py --temperatures 0.2 1.0 --output results/comparison.json
+```
+
+The comparison requires both the inference server and the app. Keep `bash scripts/serve_llamacpp.sh` and `bash scripts/serve_app.sh` running in separate terminals, then run the comparison in a third terminal.
+The default target is the app at `http://127.0.0.1:8000`. If you change it, specify the app URL with `--url`.
+
+See the [experiment guide](docs/experiments.md) for metric definitions and considerations when comparing results.
+
+## Configuration
+
+Configure the app using `.env` or environment variables. Environment variables take precedence.
+
+| Setting | Default | Purpose |
+|---|---|---|
+| `GEMMA_BASE_URL` | `http://127.0.0.1:8080/v1` | Inference API endpoint |
+| `GEMMA_MODEL` | `gemma4` | Model name exposed by the server |
+| `GEMMA_BACKEND` | `llama.cpp` | Backend label recorded and displayed: `llama.cpp` / `vllm` |
+| `GEMMA_API_KEY` | Empty | Only needed if the endpoint requires authentication |
+| `GEMMA_TIMEOUT_SECONDS` | `180` | Inference HTTP read timeout during periods with no incoming data |
+
+`GEMMA_BACKEND` does not start or switch servers.
+To use a different engine, start it separately, match the endpoint and exposed model name, and restart the app.
+The inference shell scripts do not read `.env`. Pass their settings as environment variables when running the startup command.
+
+## Development
+
+```bash
+uv sync --frozen --dev
+uv run pytest -q
+uv run ruff check src tests scripts benchmarks
+uv run ruff format --check src tests scripts benchmarks
+node --test tests/test_image_ui.cjs
+bash scripts/serve_app.sh --reload
+```
+
+Python dependencies are pinned in `uv.lock`. See `scripts/setup_llamacpp.py` for the pinned model and llama.cpp versions.
+vLLM is managed in a separate environment.
+
+```text
+src/gemma_demo/       FastAPI, inference client, and web UI
+scripts/             Download and startup scripts
+examples/            Sample inputs
+benchmarks/          Comparison scripts
+tests/               Streaming, failure handling, and input validation tests
+docs/                Environment-specific instructions and experiment guides
+```
+
+This is an educational app designed for a single user and a single worker. While one generation is running, another generation request is rejected with HTTP 429.
+With multiple processes started using `--workers`, the limit applies separately to each process, so do not increase the worker count for this tutorial.
+Both servers bind to `127.0.0.1` by default.
+
+## References
+
+- [Official Gemma 4 GGUF](https://huggingface.co/google/gemma-4-12B-it-qat-q4_0-gguf)
+- [llama.cpp](https://github.com/ggml-org/llama.cpp)
+- [vLLM](https://docs.vllm.ai/en/latest/)
+- [FastAPI](https://fastapi.tiangolo.com/)
