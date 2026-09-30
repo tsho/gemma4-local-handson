@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>レシート読み取り | Gemma Local</title>
+  <link rel="stylesheet" href="/static/receipts.css">
+  <script type="module" src="/static/receipts.js"></script>
+</head>
+<body>
+  <header><a class="brand" href="/">g<span>gemma <b>local</b></span></a><nav aria-label="ページ"><a href="/">チャット</a><a href="/receipts" aria-current="page">レシート読み取り</a></nav><button id="connection" type="button">接続を確認</button></header>
+  <main>
+    <div class="heading"><p class="eyebrow">RECEIPT READER</p><h1>レシートを、使えるテキストに。</h1><p>画像を選ぶだけで、店名・勘定項目・金額・品物を整理します。</p></div>
+    <div class="workspace">
+      <section class="card source" aria-labelledby="source-title">
+        <div class="card-heading"><span class="step">01</span><h2 id="source-title">レシート画像</h2><button id="clear" type="button" class="quiet" disabled>削除</button></div>
+        <div id="drop-area" class="drop-area">
+          <div id="empty-image"><span class="receipt-icon" aria-hidden="true">▤</span><h3>レシートをここにドロップ</h3><p>または画像を選択してください</p></div>
+          <img id="preview" alt="選択したレシート" hidden>
+          <button id="choose" class="secondary" type="button">画像を選択</button>
+          <input id="file" type="file" accept="image/png,image/jpeg,image/webp" hidden aria-label="レシート画像を選択">
+          <p id="filename" class="muted">PNG・JPEG・WebP ／ 1枚・5MBまで</p>
+        </div>
+        <label for="purpose">用途の補足 <span class="muted">任意</span></label>
+        <input id="purpose" type="text" maxlength="300" placeholder="例：来客用のお茶、事務用品の購入">
+        <p class="hint">勘定項目の候補を整理する参考にします。</p>
+        <div class="actions"><button id="extract" class="primary" type="button" disabled>レシートを読み取る <span aria-hidden="true">→</span></button><button id="stop" type="button" hidden>停止</button></div>
+        <p class="hint">明るい場所で、文字が読めるように全体を撮影してください。</p>
+      </section>
+      <section class="card result" aria-labelledby="result-title">
+        <div class="card-heading"><span class="step">02</span><h2 id="result-title">読み取り結果</h2><span id="result-state" class="badge">画像を選択してください</span></div>
+        <p id="status" role="status" aria-live="polite">読み取り後、ここで確認・修正できます。</p>
+        <fieldset id="fields" disabled>
+          <label for="store">店名</label><input id="store" placeholder="例：〇〇ストア">
+          <div class="field-grid"><div><label for="category">勘定項目 <span class="muted">候補</span></label><input id="category" placeholder="例：消耗品費"></div><div><label for="amount">合計金額</label><input id="amount" placeholder="例：1,280円"></div></div>
+          <label for="items">品物</label><textarea id="items" rows="6" placeholder="品名・数量・金額が分かる場合は、1行ずつ表示します。"></textarea>
+        </fieldset>
+        <p class="hint">画像の記載と照合して修正してください。勘定項目は用途に基づく候補です。</p>
+        <details id="raw-panel" hidden><summary>モデルの出力を確認</summary><pre id="raw"></pre></details>
+        <div class="output-heading"><h3>テキスト出力</h3><div><button id="copy" type="button" disabled>コピー</button><button id="save" type="button" disabled>TXT保存 ↓</button></div></div>
+        <textarea id="output" rows="8" readonly aria-label="コピー用テキスト" placeholder="店名：&#10;勘定項目：&#10;合計金額：&#10;品物："></textarea>
+      </section>
+    </div>
+    <p class="footnote">画像は設定済みの推論サーバーで処理します。このページは画像・結果を保存しません。再読み込み前に必要なテキストを保存してください。</p>
+  </main>
+</body>
+</html>
