@@ -73,6 +73,19 @@ API仕様は http://127.0.0.1:8000/docs です。停止はそれぞれのター�
 詳しくは [Macのセットアップ](docs/setup-mac.md)、[Linux GPU / vLLM](docs/setup-linux-gpu.md) を参照してください。
 実モデルでの確認内容と未確認範囲は [動作確認記録](docs/verification.md) にまとめています。
 
+## レシート読み取り
+
+チャット画面の「レシート読み取り」リンク、または **http://127.0.0.1:8000/receipts** を開きます。
+推論サーバーとアプリの両方を起動し、画像対応のmmprojを読み込んでおいてください。
+
+1. レシート画像を選択、またはドラッグ＆ドロップします（PNG / JPEG / WebP、1枚5MBまで）。
+2. 必要に応じて用途を入力し、「レシートを読み取る」を押します。
+3. 店名・勘定項目の候補・合計金額・品物を画像と照合し、入力欄で修正します。
+4. 「コピー」または「TXT保存」でテキストを取り出します。
+
+読めない箇所は「不明」として扱います。勘定項目は用途を基にした候補で、自動的に確定するものではありません。
+読み取り中は停止できます。画像と結果はこのページに保存されないため、再読み込み前に必要なテキストを保存してください。
+
 ## 実験の進め方
 
 1. 初期設定で同じ質問を試し、回答と時間を保存する。
@@ -114,7 +127,7 @@ uv sync --frozen --dev
 uv run pytest -q
 uv run ruff check src tests scripts benchmarks
 uv run ruff format --check src tests scripts benchmarks
-node --test tests/test_image_ui.cjs
+node --test tests/*.cjs
 bash scripts/serve_app.sh --reload
 ```
 
@@ -218,6 +231,19 @@ The API documentation is at http://127.0.0.1:8000/docs. Press `Ctrl+C` in each t
 See [Mac setup](docs/setup-mac.md) and [Linux GPU / vLLM](docs/setup-linux-gpu.md) for details.
 The [verification record](docs/verification.md) describes checks performed with the real model and areas not yet verified.
 
+## Receipt reader
+
+Open the “レシート読み取り” (Receipt reader) link on the chat page, or visit **http://127.0.0.1:8000/receipts**.
+Keep both servers running, with the image-compatible mmproj loaded by the inference server.
+
+1. Select or drag and drop a receipt image (PNG / JPEG / WebP, one image up to 5MB).
+2. Optionally describe the purchase purpose and click “レシートを読み取る” (Read receipt).
+3. Check the store name, suggested expense category, total amount, and items against the image, and edit the fields as needed.
+4. Click “コピー” (Copy) or “TXT保存” (Save TXT) to export the text.
+
+Unreadable information is treated as unknown. The expense category is a suggestion based on the purpose, not a final classification.
+You can stop extraction. This page does not persist images or results, so save the text before reloading.
+
 ## Running experiments
 
 1. Try the same question with the default settings and save the response and timings.
@@ -257,7 +283,7 @@ uv sync --frozen --dev
 uv run pytest -q
 uv run ruff check src tests scripts benchmarks
 uv run ruff format --check src tests scripts benchmarks
-node --test tests/test_image_ui.cjs
+node --test tests/*.cjs
 bash scripts/serve_app.sh --reload
 ```
 

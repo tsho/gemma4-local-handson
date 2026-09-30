@@ -43,6 +43,11 @@ def create_app(settings: Settings | None = None, transport=None) -> FastAPI:
     async def index():
         return FileResponse(STATIC / "index.html")
 
+    @app.get("/receipts", include_in_schema=False)
+    async def receipts():
+        """Serve the receipt extraction workspace."""
+        return FileResponse(STATIC / "receipts.html")
+
     @app.get("/api/health")
     async def health():
         ready = await app.state.inference.available()
