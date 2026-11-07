@@ -221,3 +221,7 @@ __marimo__/
 .runtime/
 models/
 results/
+
+# Local experiment and verification notes
+/docs/experiments.md
+/docs/verification.md
