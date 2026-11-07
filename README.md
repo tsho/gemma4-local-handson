@@ -1,5 +1,7 @@
 # Gemma Local Playground
 
+[![Open in Colab](https://colab.research.google.com/assets/colab-badge.svg)](https://colab.research.google.com/drive/1W8Vl-ilqCkLcAQDHuTso7mIQB4PnXdSk#scrollTo=KI2TiESdFcEk)
+
 ローカル環境でGemma 4を動かし、推論設定と応答を比較する中級者向けハンズオン。
 FastAPI製のWebアプリから、別プロセスの **llama.cpp / vLLM** に接続します。
 
